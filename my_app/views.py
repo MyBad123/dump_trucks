@@ -1,31 +1,27 @@
+import datetime
 import random
 import string
+import json
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import *
-from .models import *
+from .serializers import DataRegisterSerializer
+from .models import DataRegister
 from .my_scripts import *
-
-#for time
-import datetime
 
 #for dataRegister
 class DataRegisterView(APIView):
     def get(self, request):
-        reg = m_DataRegister.objects.all()
-        ser = DataRegisterSerializer(reg, many = True)
+        reg = DataRegister.objects.all()
+        ser = DataRegisterSerializer(reg, many=True)
         return Response({"registers": ser.data})
 
-    def post(self, request):
-        new_user = request.data.get("new_user")
-
-        inn = str(new_user.inn)
-
-
+    def post(self, request -> HttpRequest):
+        newUser = request.data.get("new_user")
+        inn = str(newUser.inn)
         my_str = ''
         if len(inn) == 12 or len(inn) == 10:
-            new_user.all_name = my_inn(inn)
+            newUser.all_name = my_inn(inn)
             my_str = ''
             for hz in range(10):
                  my_str += random.choice(string.ascii_letters)
@@ -188,7 +184,7 @@ class truckView(APIView):
 
         b.save()
 
-    def delete(request):
+    def delete(request:
         b = m_truk.objects.get(numder_truk = int(requests.data.get('numder_truk')))
         b.delete()
                 
