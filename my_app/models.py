@@ -1,49 +1,43 @@
 from django.db import models
 
 class DataRegister(models.Model):
-    organization = models.CharField(max_length=40)
-    inn = models.IntegerField(primary_key=True)
-    allName = models.CharField(max_length=40)
-    mail = models.EmailField()
-    tel = models.IntegerField()
+    userInn = models.IntegerField(primary_key=True)
+    userOrganizationForm = models.CharField(max_length=40)
+    userName = models.CharField(max_length=40)
+    userMail = models.EmailField()
+    userTel = models.IntegerField()
     userKind = models.CharField(max_length=40)
 
 class LoginPassword(models.Model):
-    login = models.ForeignKey('m_DataRegister', on_delete=models.CASCADE)
+    login = models.ForeignKey('DataRegister', on_delete=models.CASCADE)
     password = models.CharField(max_length=20)
-
+    
 class RegisterObject(models.Model):
-    adress = models.CharField(max_length=200)
-    number = models.CharField(max_length=200)
-    v = models.IntegerField()
-    oplata = models.CharField(max_length=20)
-    documents = models.CharField(max_length=20)
-    this_user = models.ForeignKey('m_DataRegister', on_delete=models.CASCADE)
+    objectId = models.CharField(max_length=10, primary_key=True)
+    objectAdress = models.CharField(max_length=200)
+    objectNumber = models.CharField(max_length=200)
+    objectV = models.IntegerField()
+    objectOplata = models.CharField(max_length=20)
+    objectDocuments = models.CharField(max_length=20)
+    objectUser = models.ForeignKey('DataRegister', on_delete=models.CASCADE)
 
 class Order(models.Model):
-    date = models.DateField()
-    nober = models.IntegerField()
-    v = models.IntegerField()
-    price = models.IntegerField()
-    active = models.CharField(max_length=10)
-    this_object = models.ForeignKey('m_RegisterObject', on_delete=models.CASCADE)
-    this_driver = models.ForeignKey('m_RegisterObject', on_delete=models.CASCADE, null=True)
+    orderDate = models.DateField()
+    orderChange = models.CharField(max_length=20, default='')
+    orderV = models.IntegerField(default=1)
+    orderPrice = models.IntegerField(default=1)
+    orderObject = models.ForeignKey('RegisterObject', on_delete=models.CASCADE)
 
-class Truk(models.Model):
-    model_truk = models.CharField(max_length=200)
-    numder_truk = models.IntegerField(primary_key = True)
-    series_registration = models.CharField(max_length=100)
-    series_pts = models.CharField(max_length=100)
-    v = models.IntegerField()
-    this_driver = models.ForeignKey('m_DataRegister', on_delete=models.CASCADE)
-
-class YesOrder(models.Model):
-    v = models.IntegerField()
-    truk = models.ForeignKey('m_truk', on_delete=models.CASCADE)
-    
+class Truck(models.Model):
+    truckModel = models.CharField(max_length=50)
+    truckNumber = models.IntegerField()
+    truckSeriesTS = models.IntegerField()
+    truckSeriesPT = models.IntegerField()
+    truckV = models.IntegerField()
+    truckUser = models.ForeignKey('DataRegister', on_delete=models.CASCADE)
 
 
-    
+
 
 
 

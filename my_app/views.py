@@ -1,203 +1,213 @@
-import datetime
 import random
 import string
+import requests
+import urllib
+import smtplib
 import json
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from .serialisers import (DataRegisterSerializer, LoginPasswordSerializer, 
+                        RegisterObjectSerializer, OrderSerializer)
+from .models import (DataRegister, LoginPassword, 
+                    RegisterObject, Order)
+from django.core.exceptions import ObjectDoesNotExist
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-from .serializers import DataRegisterSerializer
-from .models import DataRegister
-from .my_scripts import *
-
-#for dataRegister
 class DataRegisterView(APIView):
     def get(self, request):
-        reg = DataRegister.objects.all()
-        ser = DataRegisterSerializer(reg, many=True)
-        return Response({"registers": ser.data})
-
-    def post(self, request -> HttpRequest):
-        newUser = request.data.get("new_user")
-        inn = str(newUser.inn)
-        my_str = ''
-        if len(inn) == 12 or len(inn) == 10:
-            newUser.all_name = my_inn(inn)
-            my_str = ''
-            for hz in range(10):
-                 my_str += random.choice(string.ascii_letters)
-            my_mail(str(new_user.inn), my_str)
-        else:
-            Return("no")
-
-            
-        ser = DataRegisterSerializer(data = new_user)
-        if ser.is_valid(raise_exception = True):
-            ser.save()
-
-        b = m_LoginPassword()
-        b.login = int(new_user.inn)
-        b.password = my_str
-
-        b.save()
-
-        return Response("yes")
-
-
-class LoginPasswordView(APIView):
-    #чтоб зайти 
+        return Response(status=status.HTTP_200_OK)
     def post(self, request):
-        stat = str(request.data.get('status'))
-            
-        if stat == 'old':
-            my_login = str(request.data.get('login'))
-            my_pass = str(request.data.get('password'))
-            
-            b = m_LoginPassword.objects.get(login = my_login)
-            if b.password == my_pass:
-                bb = m_DataRegister.objects.get(inn = int(requesq.data.get('inn'))) 
-                ser = DataRegisterSerializer(data = bb)
+        newINN: str = str(request.data.get("inn"))
+        userTel = str(request.data.get("tel"))
+        userMail = str(request.data.get("userMail"))
+        userOrganizationForm = str(request.data.get("organizationForm"))
+        userKind = str(request.data.get("kind"))
+        userPass: str = ''
+        userName: str
+        #for all name
+        if len(newINN) == 10:
+            checkInnResult = requests.get('https://api-fns.ru/api/egr?req=' + newINN + '&key=14f39eb135e66a0884789dda6939865d40190880')
+            jsonINN = json.loads(checkInnResult.text)
+            userName = str(jsonINN["items"][0]["ЮЛ"]["НаимСокрЮЛ"])
+        elif len(newINN) == 12:
+            checkInnResult = requests.get('https://api-fns.ru/api/egr?req=' + newINN + '&key=')
+            jsonINN = json.loads(checkInnResult.text)  
+            userName = str(jsonINN["items"][0]["ИП"]["ФИОПолн"])
+        else:
+            return Response("no", status=status.HTTP_400_BAD_REQUEST)
+        #for new password
+        for times in range(10):
+            userPass += random.choice(string.ascii_letters)
+        #new password in your email
+        mailMsg = MIMEMultipart()
+        mailTo = userMail
+        mailMessage = 'login: ' + newINN + ' password: ' + userPass
+        mailMsg.attach(MIMEText(mailMessage, 'plain'))
+        mailServer = smtplib.SMTP('smtp.mail.ru: 25')
+        mailServer.starttls()
+        mailServer.login('gena.kuznetsov@internet.ru', 'o%pdUaeIUI12')
+        mailServer.sendmail('gena.kuznetsov@internet.ru', mailTo, mailMsg.as_string())
+        mailServer.quit()
+        #save data
+        newData = DataRegister()
+        newData.userInn = newINN
+        newData.userOrganizationForm = userOrganizationForm
+        newData.userName = userName
+        newData.userMail = userMail
+        newData.userTel = userTel
+        newData.userKind = userKind
+        newData.save()
+        #save login and password 
+        newAccount = LoginPassword()
+        newAccount.login = newINN
+        newAccount.password = userPass
+        newAccount.save()
+        return Response(status=status.HTTP_201_CREATED)
 
-                return Response({"about_user": ser.data})
+class DataRegisterOneView(APIView):
+    def get(self, request):
+        return Response(status=status.HTTP_200_OK)
+    def post(self, request):
+        try:
+            thisUser = DataRegister.objects.get(userInn=str(request.data.get("inn")))
+            serializer = DataRegisterSerializer(data=thisUser)
+            return Response({serializer.data}, status=status.HTTP_200_OK)
+        except ObjectDoesNotExist: 
+            return Response(status=status.HTTP_404_NOT_FOUND)
         
-        if stat == 'new':
-            old_login = str(request.data.get('old_login'))
-            b = m_LoginPassword.objects.get(login = old_login)
-            b.login = str(request.data.get('new_login'))
-            b.password = str(request.data.get('new_password'))
-            b.save()
-            return Response("yes")
-        
-        return Response("no")
+class LoginPasswordView(APIView):
+    def get(self, requst):
+        return Response("it is get", status=status.HTTP_200_OK)
+    def post(self, request):
+        userLogin = int(request.data.get('login'))
+        userPassword = int(request.data.get('password'))
+        try:
+           LoginPassword.objects.get(login=userLogin, password=userPassword)
+           return Response(status=status.HTTP_200_OK)
+        except ObjectDoesNotExist: 
+            return Response(status=status.HTTP_404_NOT_FOUND)
+    def put(self, request):
+        userLogin = int(request.data.get('login'))
+        userPassword = int(request.data.get('password'))
+        try:
+            newUserData = DataRegister.objects.get(userInn=userLogin)
+            newUserLoginPass = LoginPassword.objects.get(login=userLogin, password=userPassword)
+            newUserLoginPass.password = int(request.data.get('new_password'))
+            newUserLoginPass.save()
+            return Response(status=status.HTTP_201_CREATED)
+        except ObjectDoesNotExist: 
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+##########################################################################
+
+class UsersObjectView(APIView):
+    def get(self, request):
+        return Response(status=status.HTTP_200_OK)
+    def post(self, request):
+        thisUser = int(request.data.get("user"))
+        try:
+            usersObjects = RegisterObject.objects.filter(objectUser=thisUser)
+            serializer = RegisterObjectSerializer(usersObjects, many=True)
+            return Response({"objects": serializer.data}, status=status.HTTP_200_OK)
+        except ObjectDoesNotExist: 
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
 
 class RegisterObjectView(APIView):
+    def get(self, request):
+        return Response(status=status.HTTP_200_OK)
     def post(self, request):
-        stat = str(request.data.get('status'))
-        if stat == 'new':
-            b = m_RegisterObject()
-            #create new
-            b.adress = str(request.data.get('adress'))
-            b.number = str(request.data.get('number'))
-            b.v = int(request.data.get('v'))
-            b.oplata = str(request.data.get('oplata'))
-            b.documents = str(request.data.get('documents'))
-            b.this_user = int(request.data.get('this_user'))
-            
-            b.save()
-            return Response({"status": "create new object"})
+        newObject = RegisterObject()
+        id: str = ''
+        forWhile: int = 0
+        while forWhile == 0:
+            for times in range(10):
+                id += random.choice(string.ascii_letters)
+            try:
+                RegisterObject.objects.get(objectId=id)
+            except ObjectDoesNotExist:
+                forWhile += 1
+        newObject.objectId = id
+        newObject.objectAdress = str(request.data.get('adress'))
+        newObject.objectNumber = str(request.data.get('number'))
+        newObject.objectV = int(request.data.get('v'))
+        newObject.objectOplata = str(request.data.get('oplata'))
+        newObject.objectDocuments = str(request.data.get('document'))
+        newObject.objectUser = DataRegister.objects.get(userInn=int(request.data.get('user')))
+        newObject.save()
+        return Response(status=status.HTTP_201_CREATED)
+    def put(self, request):
+        id = str(request.data.get("id"))
+        updateObject = RegisterObject.objects.get(objectId=id)
+        updateObject.objectAdress = str(request.data.get('adress'))
+        updateObject.objectNumber = str(request.data.get('number'))
+        updateObject.objectV = int(request.data.get('v'))
+        updateObject.objectOplata = str(request.data.get('oplata'))
+        updateObject.objectDocuments = str(request.data.get('document'))
+        updateObject.objectUser = DataRegister.objects.get(userInn=int(request.data.get('user')))
+        updateObject.save()
+        return Response(status=status.HTTP_200_OK)
 
-        if stat == 'old':
-            my_objects = m_RegisterObject.objects.get(this_user = int(request.data.get('this_user')))
-            my_serializer = RegisterObjectSerializer(my_objects, many = True)
-
-            return Response({"objects": my_serializer.data})
-
-        if stat == 'object':
-            my_object = m_RegisterObject.objects.get(pk = int(request.data.get('id')))
-            my_serializer = RegisterObjectSerializer(data=my_object)
-            
-            return Response({"object": my_serializer.data})
+class RegisterObjectOneView(APIView):
+    def get(self, request):
+        return Response(status=status.HTTP_200_OK)
+    def post(self, request):
+        id = str(request.data.get("id"))
+        thisObject = RegisterObject.objects.get(objectId=id)
+        serializer = RegisterObjectSerializer(thisObject)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    def put(self, request):
+        id = str(request.data.get("id"))
+        thisObject = RegisterObject.objects.get(objectId=id)
+        thisObject.objectAdress = str(request.data.get('adress'))
+        thisObject.objectNumber = str(request.data.get('number'))
+        thisObject.objectV = int(request.data.get('v'))
+        thisObject.objectOplata = str(request.data.get('oplata'))
+        thisObject.objectDocuments = str(request.data.get('document'))
+        thisObject.save()
+        serializer = RegisterObjectSerializer(thisObject)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class OrderView(APIView):
+    def get(self, request):
+        return Response(status=status.HTTP_200_OK)
     def post(self, request):
-        stat = str(request.data.get('status'))
-        
-        if stat == 'new':
-            work_with_date = str(request.data.get('date'))
-            my_date = datetime.date(int(work_with_date[6] + work_with_date[7] + work_with_date[8] + work_with_date[9]), int(work_with_date[3] + work_with_date[4]), int(work_with_date[0] + work_with_date[1]))
+        #work with date
+        forDate: str = str(request.data.get('date'))
+        forYear: str = forDate[6:11]
+        forMonth: str = forDate[3:5]
+        forDay: str = forDate[0:2]
+        #create new 
+        newOrder = Order()
+        newOrder.orderDate = forYear + '-' + forMonth + '-' + forDay
+        newOrder.orderChange = str(request.data.get('change'))
+        newOrder.orderV = int(request.data.get('v'))
+        newOrder.orderPrice = int(request.data.get('price'))
+        newOrder.orderObject = RegisterObject.objects.get(objectId=str(request.data.get('object')))
+        newOrder.save()
+        return Response(status=status.HTTP_201_CREATED)
 
-            #in now day?
-            if m_Order.objects.get(date = my_date):
-                b = m_Order.objects.get(date = my_data)
-
-                if m_Order.objects.get(date = my_date) and b.this_object == int(request.data.get('this_object')):
-                    return Response("no")
-
-            #create new order
-            b = m_Order()
-            b.date = my_date
-            b.nober = int(request.data.get('noder'))
-            b.v = int(request.data.get('v'))
-            b.price = int(request.data.get('price'))
-            b.active = str(request.data.get('active'))
-            b.this_object = int(request.data.get('this_object'))
-            b.save()
-
-            return Response("yes")
-
-        if stat == 'this_order':
-            b = m_Order.objects.get(pk = int(request.data.get('pk')))
-            ser = OrderSerializer(data = b)
-            
-            return Response({"order": ser.data})
-
-    def delete(request):
-        b = m_Order(pk = int(request.data.get('pk')))
-        
-        bb = m_DataRegister.objects.get(b.this_driver)
-        b.delete()
-        
-        mysms(str(bb.tel))
-        
-        b.delete()
-
-        return Response("yes")
-            
-            
-            
-#для перевозчиков 
-class truckView(APIView):
-    def post(request):
-        if str(request.data.get('status')) == 'trucks_of_user':
-            user_trucks = m_truk.objects.get(this_driver = int(request.data.get('this_driver')))
-            ser = trukSerializer(user_trucks, many = True)
-
-            return Response({"trucks": ser.data})
-
-        if str(request.data.get('status')) == 'truck':
-            number = m_truk.objects.get(numder_truk = int(request.data.get('numder_truk')))
-            ser = trukSerializer(data = user_trucks)
-            
-            return Response({"truck": ser.data})
-
-        if str(request.data.get('status')) == 'new_truck':
-            if m_truk.objects.get(int(request.data.get('numder_truk'))) or m_truk.objects.get(int(request.data.get('series_registration'))) or m_truk.objects.get(int(request.data.get('series_pts'))):
-                return Response("no")
-            
-            b = m_truk()
-        
-            b.model_truk = request.data.get('model_truk')
-            b.numder_truk = request.data.get('numder_truk')
-            b.series_registration = request.data.get('series_registration')
-            b.series_pts = request.data.get('series_pts')
-            b.v = request.data.get('v')
-            b.this_driver = request.data.get('this_driver')            
-
-    def update(request):
-        b = m_truk.objects.get(numder_truk = int(requests.data.get('numder_truk')))
-        
-        b.model_truk = request.data.get('model_truk')
-        b.numder_truk = request.data.get('new_numder_truk')
-        b.series_registration = request.data.get('series_registration')
-        b.series_pts = request.data.get('series_pts')
-        b.v = request.data.get('v')
-        b.this_driver = request.data.get('this_driver')
-
-        b.save()
-
-    def delete(request:
-        b = m_truk.objects.get(numder_truk = int(requests.data.get('numder_truk')))
-        b.delete()
-                
-            
-            
-
-
-
-
-            
+class TruckView(APIView):
+    def get(self, request):
+        return Response(status=status.HTTP_200_OK)
+    def post(self, request):
         
 
 
+
+
+
+
+
         
+        
+        
+        
+        
+
+
+
 
 
